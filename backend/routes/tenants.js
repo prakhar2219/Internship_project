@@ -4,7 +4,6 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// POST /api/tenants/:slug/upgrade  (Admin only, tenant must match)
 router.post('/:slug/upgrade', requireAuth, requireAdmin, async (req, res) => {
   const { slug } = req.params
   if (req.session.tenant.slug !== slug) return res.status(403).json({ error: 'Forbidden: tenant mismatch' })
@@ -31,7 +30,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/tenants → list tenants
 router.get("/", async (req, res) => {
   const tenants = await Tenant.find();
   res.json(tenants);

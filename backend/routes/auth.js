@@ -8,7 +8,6 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js'
 const router = express.Router()
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 
-// LOGIN
 router.post('/login', async (req, res) => {
   const { email, password } = req.body
   if (!email || !password)
@@ -34,7 +33,6 @@ router.post('/login', async (req, res) => {
   res.json({ token })
 })
 
-// REGISTER (only admins can invite new users)
 router.post('/register', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { email, password, role } = req.body

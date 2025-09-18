@@ -12,13 +12,11 @@ export async function requireAuth(req, res, next) {
   const token = m[1]
   try {
     const payload = jwt.verify(token, JWT_SECRET)
-    // load fresh user and tenant
     const user = await User.findById(payload.userId).populate('tenantId')
     if (!user) return res.status(401).json({ error: 'Invalid token user' })
     const tenant = await Tenant.findById(user.tenantId._id)
     if (!tenant) return res.status(400).json({ error: 'Tenant not found' })
 
-    // attach session info
     req.session = {
       user: { id: user._id.toString(), email: user.email, role: user.role },
       tenant: { id: tenant._id.toString(), slug: tenant.slug, name: tenant.name, plan: tenant.plan }

@@ -5,16 +5,13 @@ import { requireAuth } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// All routes require auth
 router.use(requireAuth)
 
-// GET /api/notes — list notes for tenant
 router.get('/', async (req, res) => {
   const notes = await Note.find({ tenantId: req.session.tenant.id }).sort({ createdAt: -1 })
   res.json(notes)
 })
 
-// POST /api/notes — create a note (enforce plan limits)
 router.post('/', async (req, res) => {
   const { title, content } = req.body
   if (!title) return res.status(400).json({ error: 'title required' })
@@ -32,7 +29,6 @@ router.post('/', async (req, res) => {
   res.status(201).json(note)
 })
 
-// GET /api/notes/:id — retrieve a specific note (tenant isolation)
 router.get('/:id', async (req, res) => {
   const note = await Note.findById(req.params.id)
   if (!note) return res.status(404).json({ error: 'Not found' })
@@ -40,7 +36,6 @@ router.get('/:id', async (req, res) => {
   res.json(note)
 })
 
-// PUT /api/notes/:id
 router.put('/:id', async (req, res) => {
   const note = await Note.findById(req.params.id)
   if (!note) return res.status(404).json({ error: 'Not found' })
@@ -52,7 +47,6 @@ router.put('/:id', async (req, res) => {
   res.json(note)
 })
 
-// DELETE /api/notes/:id
 router.delete('/:id', async (req, res) => {
   const note = await Note.findById(req.params.id)
   if (!note) return res.status(404).json({ error: 'Not found' })
