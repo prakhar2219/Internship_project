@@ -9,7 +9,9 @@ import tenantsRoutes from './routes/tenants.js'
 dotenv.config()
 const app = express()
 app.use(express.json())
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }))
+app.use(cors({
+  origin: '*'
+}))
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
