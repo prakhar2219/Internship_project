@@ -1,75 +1,79 @@
-// routes/auth.js
-import express from "express"
-import User from "../models/User.js"
-import Tenant from "../models/Tenant.js"
-import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
-import { requireAuth, requireAdmin } from "../middleware/auth.js"
+// backend/middleware/seed.js
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
+import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 
-const router = express.Router()
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret"
+dotenv.config();
 
-// LOGIN
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body
-  if (!email || !password) {
-    return res.status(400).json({ error: "email and password required" })
-  }
-
-  const user = await User.findOne({ email }).populate("tenantId")
-  if (!user) return res.status(401).json({ error: "Invalid credentials" })
-
-  const ok = await bcrypt.compare(password, user.passwordHash)
-  if (!ok) return res.status(401).json({ error: "Invalid credentials" })
-
-  const token = jwt.sign(
-    {
-      userId: user._id.toString(),
-      tenantId: user.tenantId._id.toString(),
-      role: user.role,
-      tenantSlug: user.tenantId.slug,
-      plan: user.tenantId.plan,
-    },
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  )
-  res.json({ token })
-})
-
-/**
- * REGISTER (Invite User)
- * - Only Admins can create new users in their tenant
- * - Default role: MEMBER
- */
-router.post("/register", requireAuth, requireAdmin, async (req, res) => {
+async function main() {
   try {
-    const { email, password, role } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: "email and password required" })
+    const mongoUri = process.env.MONGO_URI;
+    if (!mongoUri) {
+      console.error("❌ MONGO_URI not set in environment variables!");
+      process.exit(1);
     }
 
-    // Prevent multiple admins (if you want strict)
-    if (role === "ADMIN") {
-      return res.status(403).json({ error: "Only seed/admin accounts can be ADMIN" })
+    await mongoose.connect(mongoUri, { autoIndex: true });
+    console.log("✅ Connected to MongoDB");
+
+    // Create tenants
+    const tenantsData = [
+      { name: "Acme", slug: "acme", plan: "FREE" },
+      { name: "Globex", slug: "globex", plan: "FREE" },
+    ];
+
+    const tenants = {};
+
+    for (const t of tenantsData) {
+      const tenant = await Tenant.findOneAndUpdate(
+        { slug: t.slug },
+        t,
+        { upsert: true, new: true }
+      );
+      tenants[t.slug] = tenant;
+      console.log(`✅ Tenant created/updated: ${tenant.name}`);
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10)
+    // Hash password for all users
+    const passwordHash = await bcrypt.hash("password", 10);
 
-    // Create user linked to current admin’s tenant
-    const user = new User({
-      email,
-      passwordHash,
-      tenantId: req.session.tenant.id,
-      role: role === "MEMBER" ? "MEMBER" : "MEMBER", // enforce MEMBER by default
-    })
+    // Create users
+    const usersData = [
+      { email: "admin@acme.test", role: "ADMIN", tenantSlug: "acme" },
+      { email: "user@acme.test", role: "MEMBER", tenantSlug: "acme" },
+      { email: "admin@globex.test", role: "ADMIN", tenantSlug: "globex" },
+      { email: "user@globex.test", role: "MEMBER", tenantSlug: "globex" },
+    ];
 
-    await user.save()
-    res.status(201).json({ message: "User created successfully", user: { email: user.email, role: user.role } })
+    for (const u of usersData) {
+      const tenant = tenants[u.tenantSlug];
+      if (!tenant) {
+        console.error(`❌ Tenant not found for ${u.email}`);
+        continue;
+      }
+
+      const user = await User.findOneAndUpdate(
+        { email: u.email },
+        {
+          email: u.email,
+          passwordHash,
+          role: u.role,
+          tenantId: tenant._id,
+        },
+        { upsert: true, new: true }
+      );
+
+      console.log(`✅ User created/updated: ${user.email} (${user.role})`);
+    }
+
+    console.log("🎉 Seed complete!");
+    process.exit(0);
   } catch (err) {
-    console.error(err)
-    res.status(400).json({ error: err.message })
+    console.error("❌ Error seeding database:", err);
+    process.exit(1);
   }
-})
+}
 
-export default router
+main();

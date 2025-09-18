@@ -11,26 +11,24 @@ const app = express()
 app.use(express.json())
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }))
 
+// Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
+
+// Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/notes', notesRoutes)
 app.use('/api/tenants', tenantsRoutes)
 
-// Cache Mongo connection globally to reuse across invocations
-let cached = global.mongoose
-if (!cached) cached = global.mongoose = { conn: null, promise: null }
+const PORT = process.env.PORT || 5000
 
-async function connectDB() {
-  if (cached.conn) return cached.conn
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGO_URI, { autoIndex: true }).then(m => m)
-  }
-  cached.conn = await cached.promise
-  return cached.conn
-}
-
-// Export handler for Vercel
-export default async function handler(req, res) {
-  await connectDB()
-  app(req, res)
-}
+mongoose.connect(process.env.MONGO_URI, { autoIndex: true })
+  .then(() => {
+     console.log("✅ Connected to DB:", mongoose.connection.name);
+    console.log('✅ Connected to MongoDB')
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`)
+    })
+  })
+  .catch(err => {
+    console.error('❌ MongoDB connection error', err)
+  })
